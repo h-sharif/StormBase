@@ -49,12 +49,19 @@ plot(baseflow, type = "l", ylab = "Baseflow (mm/day)",
 ### Rainfall–Runoff Event Identification
 
 ```r
-events <- event_identifier(
-  flow = test_catchment$streamflow_mmd,
-  precipitation = test_catchment$precipitation_mmd,
-  time = test_catchment$Date,
-  min_event_duration = 1,
-  max_gap_hours = 12
+events_df <- event_identifier(
+  datetime = test_catchment$Date,
+  water_input = test_catchment$precipitation_mmd,
+  flow = test_catchment$streamflow_mmd, 
+  # Bellow are default values (more details are in ?event_identifier)
+  is_daily = TRUE, # running with daily data
+  Rmin = 0.02, 
+  Lmax = 100,
+  baseflow_flag = TRUE, # provided flow is the total streamflow, so it asks to
+  # calculate and subtract baseflow values for runoff volume and runoff ratio
+  # calculations
+  exclude_na = TRUE # it removes events with missed streamflow values since
+  # those values are treated as 0 for volume calculations (na.rm = TRUE).
 )
 
 head(events)
