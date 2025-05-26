@@ -1,0 +1,29 @@
+Package: StormBase
+Type: Package
+Title: Objectively Identify Water Input (Rainfall) - Runoff Events
+Version: 0.1.0
+Author: Hamed Sharif
+Maintainer: The package maintainer <sh.hamed998@gmail.com>
+Description: This R package is based on the work of Giani et al. (2020, 2022), who originally developed the algorithm in MATLAB. 
+    To broaden accessibility and support wider adoption in flood and stormflow studies, the algorithm has been translated 
+    and implemented in R.
+    Event identification is performed using Detrending Moving-Average Cross-Correlation Analysis (DMCA). 
+    Building on this method, Sharif & Ameli (2025) identified a distinct class of rain-dominated catchments that 
+    exhibit linear time-invariant (LTI) system behavior in stormflow generation. 
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Imports: 
+    dplyr,
+    lubridate,
+    zoo
+Depends: 
+    R (>= 3.5)
+Suggests: 
+    knitr,
+    rmarkdown,
+    ggplot2,
+    segmented,
+    tidyr
+VignetteBuilder: knitr

@@ -1,0 +1,178 @@
+---
+title: "study_case"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{study_case}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(StormBase)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(segmented)
+theme_set(theme_bw(base_size = 10))
+```
+
+Let's use the `StormBase` package to delineate rainfall-runoff events with `test_catchment` data, which includes daily precipitation and streamflow in mm/day for a catchment in Great Britain (same and example.m in Giani et al. 2022). Following figure shows the forcing data.
+
+```{r, fig.width=8, fig.height=6, dpi=200}
+test_catchment %>%
+  pivot_longer(cols = c(precipitation_mmd, streamflow_mmd),
+               names_to = "var", values_to = "val") %>%
+  mutate(
+    var = ifelse(var == "precipitation_mmd",
+                 "Precipitation (mm/day)", "Streamflow (mm/day)"),
+    var = ordered(var, levels = c("Precipitation (mm/day)",
+                                  "Streamflow (mm/day)"))
+  ) %>%
+  ggplot(aes(x = Date, y = val, color = var)) +
+    geom_line(linewidth = 0.6, alpha = 0.8) +
+    scale_color_manual(
+      values = c("royalblue", "red3"),
+      guide = "none"
+    ) +
+    scale_x_date(
+      date_breaks = "2 years",
+      date_minor_breaks = "1 year",
+      date_labels = "%b %Y"
+    ) +
+    facet_wrap(vars(var), ncol = 1, scales = "free_y") +
+    labs(x = "", y = "",
+         subtitle = "StormBase `test_catchment` Data") +
+    theme(
+      plot.subtitle = element_text(face = "bold", size = 13),
+      strip.text = element_text(face = "bold", size = 12),
+      plot.margin = margin(t = 10, r = 25, b = 10, l = 10)
+    )
+```
+
+---
+
+Now we can identify the rainfall-runoff events by assuming the precipitation is in the form of liquid water input or pure rainfall. We need to set only two parameters as following:
+
+1. $R_{min}$: A minimum significant water input (rainfall) intensity to terminate events.
+2. $L_{max}$: Maximum window length used for the detrended moving-average cross-correlation analysis (DMCA) when searching for the optimal window size, defined as $2T_r+1$. Here, $T_r$ represents the characteristic catchment response time, expressed in the same units as the forcing data (daily in this case).
+
+In this document, we used a default value of 0.02 mm/hr (corresponding to about 0.5 mm/day) for $R_{min}$ and 100 time steps (days) for $L_{max}$.
+
+```{r}
+events_df <- event_identifier(
+  datetime = test_catchment$Date,
+  water_input = test_catchment$precipitation_mmd,
+  flow = test_catchment$streamflow_mmd, 
+  # Bellow are default values (more details are in ?event_identifier)
+  is_daily = TRUE, # running with daily data
+  Rmin = 0.02, 
+  Lmax = 100,
+  baseflow_flag = TRUE, # provided flow is the total streamflow, so it asks to
+  # calculate and subtract baseflow values for runoff volume and runoff ratio
+  # calculations
+  exclude_na = TRUE # it removes events with missed streamflow values since
+  # those values are treated as 0 for volume calculations (na.rm = TRUE).
+)
+```
+
+```{r}
+summary(events_df)
+```
+
+---
+
+Let's see what is the threshold response of the streamflow known as hockey stick plot.
+
+```{r, fig.width=5, fig.height=3, dpi=200}
+events_df %>%
+  ggplot(aes(x = waterInput_volume, y = stormflow_volume)) +
+  geom_point(shape = 16, color = rgb(0.2, 0.2, 0.8, alpha = 0.7),
+             size = 1) +
+  labs(x = "Water Input Volume (mm)", y = "Stormflow Volume (mm)")
+```
+
+---
+
+It seems there is hockey-stick pattern between event water input and stormflow volume. Let's check the segmented model prediction performance for the stormflow generation of this catchment.
+
+```{r, fig.width=5, fig.height=3, dpi=200}
+# testing for one break point (threshold)
+lm_model <- lm(stormflow_volume ~ waterInput_volume, data = events_df)
+seg_model <- segmented(lm_model)
+R2 <- round(summary(seg_model)$r.squared, 2)
+pval <- formatC(pscore.test(seg_model)$p.value, format = "e", digits = 2)
+threshold <- seg_model$psi[2]
+x_interval <- seq(min(events_df$waterInput_volume),
+                  max(events_df$waterInput_volume),
+                  by = 0.1)
+y_preds <- predict(seg_model, 
+                   newdata = data.frame(waterInput_volume = x_interval))
+
+# as intercept might be negative let's remove negative predictions 
+y_preds <- y_preds[which(y_preds >= 0)]
+x_interval <- x_interval[which(y_preds >= 0)]
+
+ggplot() +
+  geom_vline(xintercept = threshold, aes(color = "Threshold"),
+             linewidth = 0.3, color = "black") +
+  geom_point(
+    data = events_df,
+    aes(x = waterInput_volume, y = stormflow_volume),
+    shape = 16, color = rgb(0.2, 0.2, 0.8, alpha = 0.7), size = 1
+  ) +
+  geom_line(
+    aes(x = x_interval, y = y_preds), linewidth = 0.5, color = "red2",
+    alpha = 0.6
+  ) +
+  labs(x = "Water Input Volume (mm)", y = "Stormflow Volume (mm)",
+       subtitle = paste0("R\u00B2 = ", R2, ", ", "Breakpoint p-value = ", pval)) +
+  theme(
+      plot.subtitle = element_text(face = "bold", size = 9)
+    ) +
+  scale_x_continuous(
+    breaks = seq(0, max(x_interval), 100),
+    minor_breaks = seq(0, max(x_interval), 50)
+  )
+```
+
+---
+
+Since there is large slope difference before and after the threshold, let's check the slope values:
+
+```{r}
+coef(seg_model)
+```
+
+This shows that slope before threshold is `r round(coef(seg_model)[2], 2)` and it increases to `r round(coef(seg_model)[2] + coef(seg_model)[3], 2)`.
+
+---
+
+Baseflow signal with interpolation of event delimiter can be also calculated as follow:
+
+```{r, width=7, height=3, dpi=200}
+baseflow_vals <- baseflow_extractor(
+  water_input = test_catchment$precipitation_mmd,
+  flow = test_catchment$streamflow_mmd,
+  is_daily = TRUE, Rmin = 0.02, Lmax = 100
+)
+
+ggplot() +
+  geom_line(aes(x = test_catchment$Date, y = baseflow_vals),
+            linewidth = 0.4, color = "black") +
+  labs(x = "", y = "Baseflow (mm/day)") +
+  scale_x_date(
+      date_breaks = "2 years",
+      date_minor_breaks = "1 year",
+      date_labels = "%b %Y"
+    ) +
+  theme(
+    plot.margin = margin(t = 10, r = 25, b = 10, l = 10)
+  )
+```
+
+
