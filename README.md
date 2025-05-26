@@ -21,7 +21,8 @@ As the package is not on CRAN, you can install the package with `devtools` packa
 ``` r 
 # If you don't have devtools, run the below line first:
 # install.packages("devtools")
-devtools::install_github("h-sharif/StormBase")
+devtools::install_github("h-sharif/StormBase",
+                         build_vignettes = TRUE)
 ```
 
 ## 🚀 Quick Start
