@@ -1,8 +1,8 @@
 ---
-title: "study_case"
+title: "Study Case"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{study_case}
+  %\VignetteIndexEntry{Study Case}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -18,12 +18,12 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 library(segmented)
-theme_set(theme_bw(base_size = 10))
+theme_set(theme_bw(base_size = 8))
 ```
 
 Let's use the `StormBase` package to delineate rainfall-runoff events with `test_catchment` data, which includes daily precipitation and streamflow in mm/day for a catchment in Great Britain (same and example.m in Giani et al. 2022). Following figure shows the forcing data.
 
-```{r, fig.width=8, fig.height=6, dpi=200}
+```{r, fig.width=5, fig.height=3, dpi=100, fig.align = "center"}
 test_catchment %>%
   pivot_longer(cols = c(precipitation_mmd, streamflow_mmd),
                names_to = "var", values_to = "val") %>%
@@ -40,7 +40,7 @@ test_catchment %>%
       guide = "none"
     ) +
     scale_x_date(
-      date_breaks = "2 years",
+      date_breaks = "4 years",
       date_minor_breaks = "1 year",
       date_labels = "%b %Y"
     ) +
@@ -48,8 +48,8 @@ test_catchment %>%
     labs(x = "", y = "",
          subtitle = "StormBase `test_catchment` Data") +
     theme(
-      plot.subtitle = element_text(face = "bold", size = 13),
-      strip.text = element_text(face = "bold", size = 12),
+      plot.subtitle = element_text(face = "bold", size = 9),
+      strip.text = element_text(face = "bold", size = 9),
       plot.margin = margin(t = 10, r = 25, b = 10, l = 10)
     )
 ```
@@ -88,7 +88,7 @@ summary(events_df)
 
 Let's see what is the threshold response of the streamflow known as hockey stick plot.
 
-```{r, fig.width=5, fig.height=3, dpi=200}
+```{r, fig.width=4, fig.height=2, dpi=100, fig.align = "center"}
 events_df %>%
   ggplot(aes(x = waterInput_volume, y = stormflow_volume)) +
   geom_point(shape = 16, color = rgb(0.2, 0.2, 0.8, alpha = 0.7),
@@ -100,7 +100,7 @@ events_df %>%
 
 It seems there is hockey-stick pattern between event water input and stormflow volume. Let's check the segmented model prediction performance for the stormflow generation of this catchment.
 
-```{r, fig.width=5, fig.height=3, dpi=200}
+```{r, fig.width=4, fig.height=2, dpi=100, fig.align = "center"}
 # testing for one break point (threshold)
 lm_model <- lm(stormflow_volume ~ waterInput_volume, data = events_df)
 seg_model <- segmented(lm_model)
@@ -154,7 +154,7 @@ This shows that slope before threshold is `r round(coef(seg_model)[2], 2)` and i
 
 Baseflow signal with interpolation of event delimiter can be also calculated as follow:
 
-```{r, width=7, height=3, dpi=200}
+```{r, fig.width=4, fig.height=2, dpi=100, fig.align = "center"}
 baseflow_vals <- baseflow_extractor(
   water_input = test_catchment$precipitation_mmd,
   flow = test_catchment$streamflow_mmd,
@@ -166,7 +166,7 @@ ggplot() +
             linewidth = 0.4, color = "black") +
   labs(x = "", y = "Baseflow (mm/day)") +
   scale_x_date(
-      date_breaks = "2 years",
+      date_breaks = "4 years",
       date_minor_breaks = "1 year",
       date_labels = "%b %Y"
     ) +
